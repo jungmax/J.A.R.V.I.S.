@@ -83,7 +83,7 @@ class RobotController(Node):
         self.get_logger().info(f"📢 들어온 음성 명령: {command}")
 
         if command == "recover":
-            self.get_logger().info("✅복구모드")
+            self.get_logger().info("⚠️ 복구모드 시작")
             self.recover_robot_team_style()
 # ------------------------------------------------------------------------------------------------------------------ 
     def open_gripper(self):
@@ -100,19 +100,30 @@ class RobotController(Node):
         except Exception as e:
             self.get_logger().error(f"⚠️ 그리퍼 닫기 에러: {e}")
 # ------------------------------------------------------------------------------------------------------------------ 
-    def wait_and_spin(node, duration):
-            end_time = time.time() + duration
-            while rclpy.ok() and time.time() < end_time:
-                rclpy.spin_once(node, timeout_sec=0.1)
-                time.sleep(0.01)
+    def wait_and_spin(self, duration):
+        end_time = time.time() + duration
+        
+        while rclpy.ok() and time.time() < end_time:
+            rclpy.spin_once(self, timeout_sec=0.1)
+            time.sleep(0.01)
 
     def call_control(self, val, name):
+        # 1. 함수가 호출되어 진입했는지 확인하는 로그
+        self.get_logger().info(f"🔄 [요청 시도] {val}번, {name}")
+        
+        # 서비스 서버가 살아있는지 확인
         if not self.cli_control.wait_for_service(timeout_sec=1.0): 
+            # ⚠️ 여기서 튕기면 "아, 서버 연결 자체가 안 되었구나!" 바로 알 수 있음
+            self.get_logger().error(f"❌ [서버 연결 실패] {val}번, {name} 서버를 찾을 수 없습니다.")
             return False
-        req = self.SetRobotControl.Request()
-        req.robot_control = val
-        future = self.cli_control.call_async(req)
+        
+        req = self.SetRobotControl.Request() #두산 로봇 제어 명령을 내리기 위한 공식 빈 신청서 한 장을 뽑아서 req라는 변수에 담아둔다
+        req.robot_control = val  # 뽑아둔 빈 신청서의 '제어 명령' 칸에 val 값을 적고
+        future = self.cli_control.call_async(req) # 그 작성된 신청서를 제어기 우체통에 쏙 집어넣는 것
         start = time.time()
+
+        # 2. 메시지 발사가 정상적으로 끝났음을 알리는 로그
+        self.get_logger().info(f"📤 [전송 완료] {val}번, {name} ➔ 응답 대기 시작")
         while rclpy.ok():
             rclpy.spin_once(self, timeout_sec=0.01)
             if future.done(): 
@@ -123,24 +134,29 @@ class RobotController(Node):
     # 팀 고유 복구 (3 -> 2 -> 1)
     def recover_robot_team_style(self):
         print("\n🔄 [복구] 팀 고유 시퀀스 시작 (3 -> 2 -> 1)...")
-        if set_safe_stop_reset_type: 
-            set_safe_stop_reset_type(1)
         
-        self.call_control(3, "Safe Off Reset"); 
-        self.get_logger().info("3번, Safe Off Reset")
+        # 1. 3번 단계 실행 및 결과 검사
+        if not self.call_control(3, "Safe Off Reset"):
+            self.get_logger().error("❌ [FAIL] 3번 단계 실패! 복구를 중단합니다.")
+            return False
         self.wait_and_spin(1.0)
 
-        self.call_control(2, "Safe Stop Reset"); 
-        self.get_logger().info("2번, Safe Stop Reset")
+        # 2. 2번 단계 실행 및 결과 검사
+        if not self.call_control(2, "Safe Stop Reset"):
+            self.get_logger().error("❌ [FAIL] 2번 단계 실패! 복구를 중단합니다.")
+            return False
         self.wait_and_spin(1.0)
 
-        self.call_control(1, "Servo On")
-        self.get_logger().info("1번, Servo On")
-        self.wait_and_spin(1.0)
+        # 3. 1번(서보 온) 단계 실행 및 결과 검사
+        if not self.call_control(1, "Servo On"):
+            self.get_logger().error("❌ [FAIL] 1번 단계 실패! 복구를 중단합니다.")
+            return False
 
+        # 모든 단계를 무사히 통과했을 때만 실행됨
         self.get_logger().info("   -> 서보 켜지는 중 (3초)...")
         self.wait_and_spin(3.0)
-        self.get_logger().info("recovery_success")
+        self.get_logger().info("✅ recovery_success (복구 완료)")
+        return True
 # ------------------------------------------------------------------------------------------------------------------ 
     # 큐에 적재된 목록리스트 확인함수
     def print_queue_status(self):
@@ -161,8 +177,8 @@ def main(args = None):
 
     global DR_init
     DR_init.__dsr__node = node  # 내가 만든 노드 객체를 두산 라이브러리에 연결!
-    global movel, movej, get_current_posx, posx, posj
-    from DSR_ROBOT2 import movel, movej, get_current_posx
+    global movel, movej, get_current_posx, posx, posj, set_safe_stop_reset_type
+    from DSR_ROBOT2 import movel, movej, get_current_posx, set_safe_stop_reset_type 
     from DR_common2 import posx, posj
 
     try:
@@ -170,6 +186,7 @@ def main(args = None):
         
     except KeyboardInterrupt:
         print("🛑 사용자가 Ctrl + C를 눌러서 종료를 요청함!")
+
     finally:
         # spin이 끝나거나 종료 신호가 오면, 안전하게 뒤처리 실행!
         node.destroy_node()
