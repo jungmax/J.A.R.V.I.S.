@@ -2,6 +2,16 @@
 
 메인 컨트롤러 -> 로봇 컨트롤러
 
+.py 수정했을 때는 colcon build 해주기
+
+특정 폴더만 실행할 때
+
+colcon build --packages-select 프로젝트폴더
+
+새로운 터미널을 열었을 때
+
+source install/setup.bash 
+
 초기상태
 
 ros2 topic pub --once /robot/cmd std_msgs/msg/String "{data: 'home'}"
