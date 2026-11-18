@@ -89,45 +89,39 @@ class RobotController(Node):
         self.get_logger().info(f"📢 들어온 음성 명령: {command}")
 
         if command == "recover":
-            self.get_logger().info("⚠️ 복구모드 시작")
-            self.recover_robot_team_style()
+            self.pending = command
+            
 
     def joint_callback(self, msg):
         # msg.data에 들어 있는 숫자 배열을 파이썬 리스트로 변환
-        target_joints = list(msg.data)
+        target_joint = list(msg.data)
         # 로그로 잘 들어왔는지 확인 (f-string 문법 살짝 수정!)
-        self.get_logger().info(f"📢 들어온 타겟 관절 각도: {target_joints}")
-        
+        self.get_logger().info(f"📢 들어온 타겟 관절 각도: {target_joint}")
+        # 1. 들어온 관절 값을 클래스 변수에 저장해 둠
+        self.target_joint_data = target_joint
+        # 2. 메인 루프가 실행할 수 있도록 pending에 명령 이름 등록
+        self.pending = "move_custom_joint"
 
     def pose_callback(self, msg): 
-        # 1. 메시지 상자에서 3차원 공간 위치(x, y, z) 꺼내기
+        self.get_logger().info("📥 [포즈 토픽 수신됨!] 데이터 처리 시작...")
+        
+        # 1. 메시지에서 위치(x, y, z) 꺼내기
         tx = msg.pose.position.x
         ty = msg.pose.position.y
         tz = msg.pose.position.z
 
-        # 2. 메시지 상자에서 회전 자세(Orientation - 쿼터니언) 꺼내기
-        qx = msg.pose.orientation.x
-        qy = msg.pose.orientation.y
-        qz = msg.pose.orientation.z
-        qw = msg.pose.orientation.w
-
-        # 3. 로그로 잘 들어왔는지 확인
-        self.get_logger().info(f"📢 들어온 목표 위치 -> X: {tx}, Y: {ty}, Z: {tz}")
-
-        # 4. 단위 변환 (미터 단위를 밀리미터로 변환하는 경우)
+        # 2. 단위 변환 (미터 단위를 밀리미터로 변환)
         if abs(tx) < 10.0: 
             tx *= 1000 
             ty *= 1000 
             tz *= 1000
 
-        # 5. 현재 로봇의 위치/자세를 가져와서 회전 값 등 부족한 부분을 채워넣기
-        curr_pos, _ = get_current_posx()
-        if curr_pos:
-            # 보통 x, y, z는 새로운 목표값으로 바꾸고, 
-            # 회전(rx, ry, rz 또는 쿼터니언)은 현재 로봇의 자세나 필요한 값을 조합합니다.
-            # (두산 로봇 라이브러리에 따라 posx 구조에 맞춰 리스트나 오일러 각으로 변환할 수 있습니다)
-            
-            target = [tx, ty, tz, curr_pos[3], curr_pos[4], curr_pos[5]]
+        # 3. 콜백에서는 통신하지 않고 값만 변수에 저장한 뒤 즉시 펜딩 걸기!
+        self.target_tx = tx
+        self.target_ty = ty
+        self.target_tz = tz
+        
+        self.get_logger().info(f"✅ 타겟 포즈 접수 완료 -> X: {tx}, Y: {ty}, Z: {tz}")
                
 # ------------------------------------------------------------------------------------------------------------------ 
     # 로봇 상태 확인
@@ -154,14 +148,15 @@ class RobotController(Node):
         except Exception as e:
             self.get_logger().error(f"⚠️ 그리퍼 닫기 에러: {e}")
 # ------------------------------------------------------------------------------------------------------------------ 
-    # 복구 함수
+    # 딜레이 스핀 함수
     def wait_and_spin(self, duration):
         end_time = time.time() + duration
         
         while rclpy.ok() and time.time() < end_time:
             rclpy.spin_once(self, timeout_sec=0.1)
             time.sleep(0.01)
-
+# ------------------------------------------------------------------------------------------------------------------ 
+    # 복구 함수
     def call_control(self, val, name):
         # 1. 함수가 호출되어 진입했는지 확인하는 로그
         self.get_logger().info(f"🔄 [요청 시도] {val}번, {name}")
@@ -223,6 +218,10 @@ class RobotController(Node):
                 self.move_home()
             elif cmd == "init":
                 self.move_init()
+            elif cmd == "recover":
+                self.mode_recover()      
+            elif cmd == "move_custom_joint":         
+                self.move_custom_joint()  
         finally:
             self.pending = None    # 끝나면 비움
 # ------------------------------------------------------------------------------------------------------------------     
@@ -241,13 +240,33 @@ class RobotController(Node):
     def move_init(self):
         try:
             self.get_logger().info("초기 포지션으로 이동 시작...")
-            ret = movej([0, 0, 0, 0, 90, 0], vel=60, acc=60) 
+            ret = movej([0, 0, 0, 0, 0, 0], vel=60, acc=60) 
             time.sleep(3.0); 
             self.get_logger().info(f"movel ret={ret}")
             self.get_logger().info(f"이동 후 state={get_robot_state()}, pos={get_current_posx()[0]}") 
             self.get_logger().info("✅ 초기 포지션 완료") 
         except Exception as e:
             self.get_logger().error(f"❌ 초기 포지션 이동 중 에러 발생: {e} ")
+            
+    def mode_recover(self):
+            try:
+                self.get_logger().info("⚠️ 복구모드 시작")
+                self.recover_robot_team_style()
+            except Exception as e:
+                self.get_logger().error(f"❌ 복구모드 중 에러 발생: {e} ")    
+
+    def move_custom_joint(self):
+        try:
+            self.get_logger().info(f"🎯 지정한 각도(좌표)로 이동 시작: {self.target_joint_data}")
+            # movej 함수를 이용해 해당 좌표로 직선 이동 (속도, 가속도 60)
+            ret = movej(self.target_joint_data, vel=60, acc=60) 
+            time.sleep(3.0) 
+            self.get_logger().info(f"movej ret={ret}")
+            self.get_logger().info(f"이동 후 state={get_robot_state()}, pos={get_current_posx()[0]}")
+            self.get_logger().info("✅ 커스텀 각도 이동 완료") 
+        except Exception as e:
+            self.get_logger().error(f"❌ 커스텀 포즈 이동 중 에러 발생: {e}")
+
 
 # ------------------------------------------------------------------------------------------------------------------ 
     # 큐에 적재된 목록리스트 확인함수
