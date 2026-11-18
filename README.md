@@ -12,6 +12,8 @@ colcon build --packages-select 프로젝트폴더
 
 source install/setup.bash 
 
+# 토픽 문자 및 데이터 
+
 초기상태
 
 ros2 topic pub --once /robot/cmd std_msgs/msg/String "{data: 'home'}"
