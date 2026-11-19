@@ -39,20 +39,6 @@ source install/setup.bash
 ```bash
  ros2 run jungmax1346  robot
 ```
-# 토픽 문자 및 데이터 
-
-초기상태
-```bash
- ros2 topic pub --once /robot/cmd std_msgs/msg/String "{data: 'init'}"
-```
-집으로 이동시킬 때
-```bash
- ros2 topic pub --once /robot/cmd std_msgs/msg/String "{data: 'home'}"
-```
-원하는 각도로 이동시킬 때
-```bash
- ros2 topic pub --once /robot/target_joint std_msgs/msg/Float64MultiArray "{data: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}"
-```
 
 ## 구독 토픽
 
