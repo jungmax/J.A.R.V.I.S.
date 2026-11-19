@@ -59,7 +59,7 @@ source install/setup.bash
 
 ## 구독 토픽
 
-| 토픽 | 타입 | 설명 |
+| 토픽 주소 | 타입 | 설명 |
 |---|---|---|
 | `/robot/cmd` | `std_msgs/String` | `home`, `init`, `circle`, `stop` |
 | `/robot/gripper` | `std_msgs/String` | `open`, `close` |
