@@ -13,13 +13,13 @@ ROS2 토픽으로 두산 로보틱스 M0609 협동로봇과 그리퍼를 제어�
 
 # 기본 설정
 
-~.py 수정했을 때 마다 항상 colcon build 해주기
+파일(~.py) 수정했을 때 마다 항상 빌드 해주기
 
 특정 폴더만 실행할 때
 ```bash
-colcon build --packages-select 프로젝트폴더
+colcon build --packages-select <프로젝트폴더>
 ```
-새로운 터미널을 열었을 때
+새로운 터미널을 열었을 때 소싱 해주기
 ```bash
 source install/setup.bash 
 ```
