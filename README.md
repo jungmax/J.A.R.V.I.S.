@@ -6,7 +6,7 @@
 ![GitHub](https://img.shields.io/badge/GitHub-181717?style=flat&logo=github&logoColor=white) 
 
 ROS2 토픽으로 두산 로보틱스 M0609 협동로봇과 그리퍼를 제어하는 노드입니다.
-반복 동작(`circle`)을 `stop` 토픽으로 멈추고, 동작 중 들어온 다른 명령은 거절하는 구조를 포함합니다.
+반복 동작(`ex: circle`)을 `stop` 토픽으로 멈추고, 동작 중 들어온 다른 명령은 거절하는 구조를 포함합니다.
 
 ## 주요 기능
 
@@ -16,7 +16,7 @@ ROS2 토픽으로 두산 로보틱스 M0609 협동로봇과 그리퍼를 제어�
 - 로봇 에러 복구 시퀀스 (Safe Off Reset → Safe Stop Reset → Servo On)
 - 반복 동작 정지 기능 (`stop_requested` 플래그)
 
-# 기본 설정
+## 기본 설정
 
 파일(~.py) 수정했을 때 마다 항상 빌드 해주기
 
@@ -29,7 +29,7 @@ colcon build --packages-select <프로젝트폴더>
 source install/setup.bash 
 ```
 
-# 로봇 제어 실행
+## 로봇 제어 실행
 
 가상 시뮬레이션 런치 파일
 ```bash
