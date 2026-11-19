@@ -14,20 +14,26 @@ colcon build --packages-select 프로젝트폴더
 
 source install/setup.bash 
 
+# 로봇 제어 실행
+
+가상 시뮬레이션 런치 파일
+
+ ros2 launch dsr_bringup2 dsr_bringup2_moveit.launch.py mode:=virtual model:=m0609 host:=127.0.0.1
+
+로봇 파일 실행
+
+ ros2 run jungmax1346  robot
+
 # 토픽 문자 및 데이터 
 
 초기상태
 
-ros2 topic pub --once /robot/cmd std_msgs/msg/String "{data: 'home'}"
+ ros2 topic pub --once /robot/cmd std_msgs/msg/String "{data: 'home'}"
 
 집으로 이동시킬 때
 
-ros2 topic pub --once /robot/cmd std_msgs/msg/String "{data: 'home'}"
-
-원하는 포즈로 이동 시킬 때
-
-ros2 topic pub --once /robot/target_pose geometry_msgs/msg/PoseStamped "{header: {frame_id: 'base'}, pose: {position: {x: 0.0, y: 0.0, z: 0.0}, orientation: {x: 0.0, y: 0.0, z: 0.0, w: 0.0}}}"
+ ros2 topic pub --once /robot/cmd std_msgs/msg/String "{data: 'home'}"
 
 원하는 각도로 이동시킬 때
 
-ros2 topic pub --once /robot/target_joint std_msgs/msg/Float64MultiArray "{data: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}"
+ ros2 topic pub --once /robot/target_joint std_msgs/msg/Float64MultiArray "{data: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}"
