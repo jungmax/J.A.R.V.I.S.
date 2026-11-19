@@ -4,7 +4,7 @@
 
 # 기본 설정
 
-.py 수정했을 때는 colcon build 해주기
+~.py 수정했을 때는 colcon build 해주기
 
 특정 폴더만 실행할 때
 
