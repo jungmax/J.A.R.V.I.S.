@@ -28,7 +28,7 @@ source install/setup.bash
 
 초기상태
 
- ros2 topic pub --once /robot/cmd std_msgs/msg/String "{data: 'home'}"
+ ros2 topic pub --once /robot/cmd std_msgs/msg/String "{data: 'init'}"
 
 집으로 이동시킬 때
 
