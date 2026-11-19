@@ -33,10 +33,13 @@ class RobotController(Node):
     def __init__(self):
         super().__init__("robot_controller")
         self.get_logger().info('🚀 robot Controller 초기화 상태!!. 명령 대기중..')
+
+        # 변수
         self.pending = None
+        self.stop_requested = False  # 반복 함수 멈추기 위한 변수
+ 
         # 1. 구독자 생성
         self.create_subscription(String, '/robot/cmd', self.robot_callback, 10)
-        # self.create_subscription(String, '/robot/jog', self.jog_callback, 10)
         self.create_subscription(String, '/robot/gripper', self.gripper_callback, 10)
         self.create_subscription(String, '/robot/mode', self.mode_callback, 10)
         self.create_subscription(PoseStamped, '/robot/target_pose', self.pose_callback, 10)
@@ -61,12 +64,13 @@ class RobotController(Node):
 
         if command == "home":
             self.pending = command
-
         elif command == "init":
             self.pending = command
-
+        elif command == "circle":
+            self.pending = command
         elif command == "stop":
             self.get_logger().info("🛑 비상 정지 실행.")
+            self.stop_requested = True
         else:
             self.get_logger().warn(f"⚠️ 알 수 없는 명령입니다: {command}")
 
@@ -209,19 +213,22 @@ class RobotController(Node):
         return True
 # ------------------------------------------------------------------------------------------------------------------     
     # 동작 루프 실행 함수
-    def run_pending(self):
-        cmd = self.pending
-        if cmd is None:
+    def run(self):
+        command = self.pending
+        if command is None:
             return                 # 할 일 없으면 그냥 리턴
+        self.busy = True 
         try:
-            if cmd == "home":
+            if command == "home":
                 self.move_home()
-            elif cmd == "init":
+            elif command == "init":
                 self.move_init()
-            elif cmd == "recover":
+            elif command == "circle":
+                self.circle()      
+            elif command == "move_custom_joint":         
+                self.move_custom_joint() 
+            elif command == "recover":
                 self.mode_recover()      
-            elif cmd == "move_custom_joint":         
-                self.move_custom_joint()  
         finally:
             self.pending = None    # 끝나면 비움
 # ------------------------------------------------------------------------------------------------------------------     
@@ -247,13 +254,21 @@ class RobotController(Node):
             self.get_logger().info("✅ 초기 포지션 완료") 
         except Exception as e:
             self.get_logger().error(f"❌ 초기 포지션 이동 중 에러 발생: {e} ")
-            
-    def mode_recover(self):
-            try:
-                self.get_logger().info("⚠️ 복구모드 시작")
-                self.recover_robot_team_style()
-            except Exception as e:
-                self.get_logger().error(f"❌ 복구모드 중 에러 발생: {e} ")    
+              
+    def circle(self):
+        self.stop_requested = False   # 시작할 때 초기화
+        angles = [0, 120, 240, 360]
+        try:
+            self.get_logger().info("돌기 시작")
+            while rclpy.ok() and not self.stop_requested:
+                for a in angles:
+                    movej([a, 90, 0, 0, 0, 0], vel=60, acc=60)
+                    self.wait_and_spin(1.0)   # sleep 대신 spin → stop 토픽 수신 가능
+                    if self.stop_requested:
+                        break
+            self.get_logger().info("⏹ 돌기 정지")
+        except Exception as e:
+            self.get_logger().error(f"❌ 돌기 중 에러 발생: {e}")
 
     def move_custom_joint(self):
         try:
@@ -266,21 +281,15 @@ class RobotController(Node):
             self.get_logger().info("✅ 커스텀 각도 이동 완료") 
         except Exception as e:
             self.get_logger().error(f"❌ 커스텀 포즈 이동 중 에러 발생: {e}")
-
+    
+    def mode_recover(self):
+                try:
+                    self.get_logger().info("⚠️ 복구모드 시작")
+                    self.recover_robot_team_style()
+                except Exception as e:
+                    self.get_logger().error(f"❌ 복구모드 중 에러 발생: {e} ")  
 
 # ------------------------------------------------------------------------------------------------------------------ 
-    # 큐에 적재된 목록리스트 확인함수
-    def print_queue_status(self):
-        # 큐 객체를 직접 잠그지 않고 list로 변환하여 안전하게 복사
-        with self.cmd_queue.mutex:
-            current_items = list(self.cmd_queue.queue)
-        
-        if current_items:
-            # 보기 좋게 포맷팅 (예: [('CMD', 'UP'), ('GRIPPER', 'close'), ('CMD', 'SCAN')])
-            items_str = " ➔ ".join([f"({m_type}: {m_val})" for m_type, m_val in current_items])
-            self.get_logger().info(f"📦 [큐 대기열 현황] (총 {len(current_items)}개 대기 중) ➔ {items_str}")
-        else:
-            self.get_logger().info("📦 [큐 대기열 현황] 텅 빔 (Idle)")
 # -------------------------------------------------------------------------------------------------------------            
 def main(args = None):
     rclpy.init(args=args)
@@ -296,7 +305,7 @@ def main(args = None):
         while rclpy.ok():
             rclpy.spin_once(node, timeout_sec=0.01) 
             node.state_check()
-            node.run_pending() 
+            node.run() 
     except KeyboardInterrupt:
         print("🛑 사용자가 Ctrl + C를 눌러서 종료를 요청함!")
 
