@@ -17,9 +17,9 @@ source install/setup.bash
 # 로봇 제어 실행
 
 가상 시뮬레이션 런치 파일
-
+'''bash
  ros2 launch dsr_bringup2 dsr_bringup2_moveit.launch.py mode:=virtual model:=m0609 host:=127.0.0.1
-
+'''
 로봇 파일 실행
 
  ros2 run jungmax1346  robot
