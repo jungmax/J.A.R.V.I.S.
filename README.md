@@ -1,4 +1,7 @@
 # Robot Controller (ROS2 + Doosan M0609)
+![Python](https://img.shields.io/badge/Python-3776AB?logo=python&logoColor=white) 
+![ROS 2](https://img.shields.io/badge/ROS_2-22314E?logo=ros&logoColor=white) 
+![Ubuntu](https://img.shields.io/badge/Ubuntu-E95420?logo=ubuntu&logoColor=white)
 
 ROS2 토픽으로 두산 로보틱스 M0609 협동로봇과 그리퍼를 제어하는 노드입니다.
 반복 동작(`circle`)을 `stop` 토픽으로 멈추고, 동작 중 들어온 다른 명령은 거절하는 구조를 포함합니다.
