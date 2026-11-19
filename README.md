@@ -7,11 +7,11 @@
 ~.py 수정했을 때 마다 항상 colcon build 해주기
 
 특정 폴더만 실행할 때
-
+```bash
 colcon build --packages-select 프로젝트폴더
-
-새로운 터미널을 열었을 때
 ```
+새로운 터미널을 열었을 때
+```bash
 source install/setup.bash 
 ```
 # 로봇 제어 실행
