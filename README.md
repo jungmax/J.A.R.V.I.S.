@@ -8,6 +8,18 @@
 ROS2 토픽으로 두산 로보틱스 M0609 협동로봇과 그리퍼를 제어하는 노드입니다.
 반복 동작(`ex: circle`)을 `stop` 토픽으로 멈추고, 동작 중 들어온 다른 명령은 거절하는 구조를 포함합니다.
 
+
+## 동작 구조
+
+```
+토픽 수신 → 콜백이 pending에 명령 저장 → main 루프의 run()이 pending을 읽어 실행
+```
+
+- 콜백은 `pending`에 "할 일 메모"만 남기고 바로 끝납니다.
+- 실제 동작은 `main()` 루프의 `run()`이 실행합니다.
+- 반복 동작 중에는 `wait_and_spin()`이 `spin_once`를 대신 돌려 `stop` 콜백을 받을 수 있게 합니다.
+
+
 ## 주요 기능
 
 - 토픽 기반 동작 명령 (`home`, `init`, `circle`, `stop`)
@@ -16,29 +28,34 @@ ROS2 토픽으로 두산 로보틱스 M0609 협동로봇과 그리퍼를 제어�
 - 로봇 에러 복구 시퀀스 (Safe Off Reset → Safe Stop Reset → Servo On)
 - 반복 동작 정지 기능 (`stop_requested` 플래그)
 
+
 ## 기본 설정
 
 파일(~.py) 수정했을 때 마다 항상 빌드 해주기
 
 특정 폴더만 실행할 때
 ```bash
-colcon build --packages-select <프로젝트폴더>
+colcon build --packages-select <프로젝트폴더명>
 ```
 새로운 터미널을 열었을 때 소싱 해주기
 ```bash
 source install/setup.bash 
 ```
 
+
 ## 로봇 제어 실행
 
-가상 시뮬레이션 런치 파일
+
+### 가상 시뮬레이션 런치 파일
 ```bash
  ros2 launch dsr_bringup2 dsr_bringup2_moveit.launch.py mode:=virtual model:=m0609 host:=127.0.0.1
 ```
-로봇 파일 실행
+
+### 로봇 파일 실행
 ```bash
  ros2 run jungmax1346  robot
 ```
+
 
 ## 구독 토픽
 
@@ -49,6 +66,7 @@ source install/setup.bash
 | `/robot/mode` | `std_msgs/String` | `recover` |
 | `/robot/target_joint` | `std_msgs/Float64MultiArray` | 관절 각도 6개로 이동 |
 | `/robot/target_pose` | `geometry_msgs/PoseStamped` | 타겟 포즈 수신 (이동 동작은 미구현) |
+
 
 ## 사용 방법
 
@@ -69,15 +87,6 @@ ros2 topic pub --once /robot/mode std_msgs/msg/String "{data: 'recover'}"
 ros2 topic pub --once /robot/target_joint std_msgs/msg/Float64MultiArray "{data: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}"
 ```
 
-## 동작 구조
-
-```
-토픽 수신 → 콜백이 pending에 명령 저장 → main 루프의 run()이 pending을 읽어 실행
-```
-
-- 콜백은 `pending`에 "할 일 메모"만 남기고 바로 끝납니다.
-- 실제 동작은 `main()` 루프의 `run()`이 실행합니다.
-- 반복 동작 중에는 `wait_and_spin()`이 `spin_once`를 대신 돌려 `stop` 콜백을 받을 수 있게 합니다.
 
 ## 트러블슈팅
 
@@ -93,6 +102,7 @@ ros2 topic pub --once /robot/target_joint std_msgs/msg/Float64MultiArray "{data:
 | 8 | busy일 때 stop도 거절됨 | stop 처리가 busy 체크보다 뒤에 있음 | stop을 busy 체크보다 **먼저** 처리 |
 | 9 | `self.busy` 관련 에러 가능성 | `__init__`에 `self.busy = False` 선언이 없음 | `__init__`에서 `self.busy = False` 선언 |
 
+
 ## 학습한 개념
 
 | 개념 | 핵심 |
@@ -102,6 +112,7 @@ ros2 topic pub --once /robot/target_joint std_msgs/msg/Float64MultiArray "{data:
 | `return` | 그 함수 하나만 종료하고, 클래스나 노드는 영향 없음 |
 | while 조건 vs if 체크 | while은 for가 전부 끝나야 다시 검사되므로, 이동마다 확인하려면 for 안의 if가 필요함 |
 | `break` vs `return` | `break`는 가장 안쪽 반복문 하나만 탈출하고, `return`은 함수 전체를 종료함 |
+
 
 ## 알려진 한계
 
