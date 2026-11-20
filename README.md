@@ -53,7 +53,7 @@ source install/setup.bash
 
 ### 로봇 파일 실행
 ```bash
- ros2 run jungmax1346  robot
+ ros2 run jarvis  robot
 ```
 
 
