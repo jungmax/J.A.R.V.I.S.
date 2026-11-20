@@ -71,24 +71,24 @@ source install/setup.bash
 ## 사용 방법
 
 
-# 반복 동작 시작
+### 반복 동작 시작
 ```bash
 ros2 topic pub --once /robot/cmd std_msgs/msg/String "{data: 'circle'}"
 ```
 
-# 반복 동작 정지
+### 반복 동작 정지
 ```bash
 ros2 topic pub --once /robot/cmd std_msgs/msg/String "{data: 'stop'}"
 ```
-# 홈 위치로 이동
+### 홈 위치로 이동
 ```bash
 ros2 topic pub --once /robot/cmd std_msgs/msg/String "{data: 'home'}"
 ```
-# 에러 복구
+### 에러 복구
 ```bash
 ros2 topic pub --once /robot/mode std_msgs/msg/String "{data: 'recover'}"
 ```
-# 원하는 각도 조절
+### 원하는 각도 조절
 ```bash
 ros2 topic pub --once /robot/target_joint std_msgs/msg/Float64MultiArray "{data: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}"
 ```
