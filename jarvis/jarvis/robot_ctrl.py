@@ -37,8 +37,10 @@ class RobotController(Node):
         # 변수
         self.pending = None
         self.stop_requested = False  # 반복 함수 멈추기 위한 변수
- 
-        # 1. 구독자 생성S
+        self.running = False
+        self.activing = None
+
+        # 1. 구독자 생성
         self.create_subscription(String, '/robot/cmd', self.robot_callback, 10)
         self.create_subscription(String, '/robot/gripper', self.gripper_callback, 10)
         self.create_subscription(String, '/robot/mode', self.mode_callback, 10)
@@ -215,8 +217,18 @@ class RobotController(Node):
     # 동작 루프 실행 함수
     def run(self):
         command = self.pending
+        
         if command is None:
-            return                 # 할 일 없으면 그냥 리턴
+            return
+        
+        if self.running == True:    
+            self.get_logger().warn(f'⚠️ 현재 {self.activing} 동작 진행중 멈출려면 stop 명령 보내세요!')
+            return
+        
+        self.running = True
+        self.activing = command
+
+
         try:
             if command == "home":
                 self.move_home()
@@ -227,9 +239,11 @@ class RobotController(Node):
             elif command == "move_custom_joint":         
                 self.move_custom_joint() 
             elif command == "recover":
-                self.mode_recover()      
+                self.mode_recover()        
+
         finally:
             self.pending = None    # 끝나면 비움
+            self.running = False
 # ------------------------------------------------------------------------------------------------------------------     
     # 실제 이동 함수
     def move_home(self):
