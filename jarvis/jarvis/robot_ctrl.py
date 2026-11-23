@@ -24,11 +24,15 @@ except ImportError:
 movel = None
 movej = None
 get_current_posx = None
+get_current_posj = None
 posx = None
 posj = None
 set_safe_stop_reset_type = None
 set_robot_mode = None
-# -----------------------------------------------------------------------------------------------------------------  
+# -----------------------------------------------------------------------------------------------------------------
+class StopRequested(BaseException):
+    pass  
+# -----------------------------------------------------------------------------------------------------------------
 class RobotController(Node):
     def __init__(self):
         super().__init__("robot_controller")
@@ -37,8 +41,8 @@ class RobotController(Node):
         # 변수
         self.pending = None
         self.stop_requested = False  # 반복 함수 멈추기 위한 변수
-        self.running = False
         self.activing = None
+        self.running = False
 
         # 1. 구독자 생성
         self.create_subscription(String, '/robot/cmd', self.robot_callback, 10)
@@ -64,15 +68,13 @@ class RobotController(Node):
         command = msg.data.lower().strip()
         self.get_logger().info(f"📢 들어온 음성 명령: {command}")
 
-        if command == "home":
-            self.pending = command
-        elif command == "init":
-            self.pending = command
-        elif command == "circle":
-            self.pending = command
-        elif command == "stop":
+        if command == "stop":
             self.get_logger().info("🛑 비상 정지 실행.")
             self.stop_requested = True
+            return
+        
+        if command in ["home", "init", "circle"]:
+            self.def_pending(command)
         else:
             self.get_logger().warn(f"⚠️ 알 수 없는 명령입니다: {command}")
 
@@ -128,7 +130,97 @@ class RobotController(Node):
         self.target_tz = tz
         
         self.get_logger().info(f"✅ 타겟 포즈 접수 완료 -> X: {tx}, Y: {ty}, Z: {tz}")
-               
+# ------------------------------------------------------------------------------------------------------------------     
+    # 동작 루프 실행 함수
+    def run(self):
+        command = self.pending
+        self.running = True
+        self.activing = command
+
+        try:
+            if command == "home":
+                self.move_home()
+            elif command == "init":
+                self.move_init()
+            elif command == "circle":
+                self.circle()      
+            elif command == "move_custom_joint":         
+                self.move_custom_joint() 
+            elif command == "recover":
+                self.mode_recover()
+
+        except StopRequested:  
+            self.get_logger().info(f"⏹ {command} 정지됨")
+        
+        finally:
+            self.pending = None    # 끝나면 비움
+            self.running = False
+            self.activing = False
+# ------------------------------------------------------------------------------------------------------------------     
+    # 실제 이동 함수
+    def move_home(self):
+        try:
+            self.get_logger().info("\n" + "-" * 50 + "\n 🏠 홈 포지션으로 이동 시작...\n" + "-" * 50)
+            ret = movej([0, 0, 90, 0, 90, 0], vel=60, acc=60) 
+            time.sleep(3.0); 
+            self.get_logger().info(f"movel ret={ret}")
+            self.get_logger().info(f"이동 후 state={get_robot_state()}, pos={get_current_posj()}")
+            self.get_logger().info("\n" + "-" * 50 + "\n ✅ 홈 포지션 완료\n" + "-" * 50)
+        except Exception as e:
+            self.get_logger().error(f"❌ 홈 이동 중 에러 발생: {e} ")
+        
+    def move_init(self):
+        try:
+            self.get_logger().info("\n" + "-" * 50 + "\n 초기 포지션으로 이동 시작...\n" + "-" * 50)
+            ret = movej([0, 0, 0, 0, 0, 0], vel=60, acc=60) 
+            time.sleep(3.0); 
+            self.get_logger().info(f"movel ret={ret}")
+            self.get_logger().info(f"이동 후 state={get_robot_state()}, pos={get_current_posj()}") 
+            self.get_logger().info("✅ 초기 포지션 완료") 
+        except Exception as e:
+            self.get_logger().error(f"❌ 초기 포지션 이동 중 에러 발생: {e} ")
+              
+    def circle(self):
+        self.stop_requested = False   # 시작할 때 초기화
+        angles = [0, 120, 240, 360]
+        try:
+            self.get_logger().info("\n" + "-" * 50 + f"\n{self.activing} 행동 시작\n" + "-" * 50)
+            while rclpy.ok():
+                for a in angles:
+                    movej([a, 90, 0, 0, 0, 0], vel=60, acc=60)
+                    self.wait_and_spin(1.0)
+                    self.check_stop() 
+            self.get_logger().info("⏹ 돌기 정지")
+        except Exception as e:
+            self.get_logger().error(f"❌ 돌기 중 에러 발생: {e}")
+
+    def move_custom_joint(self):
+        try:
+            self.get_logger().info(f"🎯 지정한 각도(좌표)로 이동 시작: {self.target_joint_data}")
+            # movej 함수를 이용해 해당 좌표로 직선 이동 (속도, 가속도 60)
+            ret = movej(self.target_joint_data, vel=60, acc=60) 
+            time.sleep(3.0) 
+            self.get_logger().info(f"movej ret={ret}")
+            self.get_logger().info(f"이동 후 state={get_robot_state()}, pos={get_current_posx()[0]}")
+            self.get_logger().info("✅ 커스텀 각도 이동 완료") 
+        except Exception as e:
+            self.get_logger().error(f"❌ 커스텀 포즈 이동 중 에러 발생: {e}")
+    
+    def mode_recover(self):
+                try:
+                    self.get_logger().info("⚠️ 복구모드 시작")
+                    self.recover_robot_team_style()
+                except Exception as e:
+                    self.get_logger().error(f"❌ 복구모드 중 에러 발생: {e} ")              
+# ------------------------------------------------------------------------------------------------------------------       
+    # 헬퍼 함수 (클래스 안에 추가)
+    def def_pending(self, command):
+        if self.running:
+            self.get_logger().warn(
+                f'⚠️ 현재 {self.activing} 동작 진행중. 멈추려면 stop 명령을 보내세요!')
+            return False
+        self.pending = command
+        return True                      
 # ------------------------------------------------------------------------------------------------------------------ 
     # 로봇 상태 확인
     def state_check(self):
@@ -213,104 +305,20 @@ class RobotController(Node):
         self.wait_and_spin(3.0)
         self.get_logger().info("✅ recovery_success (복구 완료)")
         return True
-# ------------------------------------------------------------------------------------------------------------------     
-    # 동작 루프 실행 함수
-    def run(self):
-        command = self.pending
-        
-        if command is None:
-            return
-        
-        if self.running == True:    
-            self.get_logger().warn(f'⚠️ 현재 {self.activing} 동작 진행중 멈출려면 stop 명령 보내세요!')
-            return
-        
-        self.running = True
-        self.activing = command
 
-
-        try:
-            if command == "home":
-                self.move_home()
-            elif command == "init":
-                self.move_init()
-            elif command == "circle":
-                self.circle()      
-            elif command == "move_custom_joint":         
-                self.move_custom_joint() 
-            elif command == "recover":
-                self.mode_recover()        
-
-        finally:
-            self.pending = None    # 끝나면 비움
-            self.running = False
-# ------------------------------------------------------------------------------------------------------------------     
-    # 실제 이동 함수
-    def move_home(self):
-        try:
-            self.get_logger().info("🏠 홈 포지션으로 이동 시작...")
-            ret = movej([0, 0, 90, 0, 90, 0], vel=60, acc=60) 
-            time.sleep(3.0); 
-            self.get_logger().info(f"movel ret={ret}")
-            self.get_logger().info(f"이동 후 state={get_robot_state()}, pos={get_current_posx()[0]}")
-            self.get_logger().info("✅ 홈 포지션 완료") 
-        except Exception as e:
-            self.get_logger().error(f"❌ 홈 이동 중 에러 발생: {e} ")
-        
-    def move_init(self):
-        try:
-            self.get_logger().info("초기 포지션으로 이동 시작...")
-            ret = movej([0, 0, 0, 0, 0, 0], vel=60, acc=60) 
-            time.sleep(3.0); 
-            self.get_logger().info(f"movel ret={ret}")
-            self.get_logger().info(f"이동 후 state={get_robot_state()}, pos={get_current_posx()[0]}") 
-            self.get_logger().info("✅ 초기 포지션 완료") 
-        except Exception as e:
-            self.get_logger().error(f"❌ 초기 포지션 이동 중 에러 발생: {e} ")
-              
-    def circle(self):
-        self.stop_requested = False   # 시작할 때 초기화
-        angles = [0, 120, 240, 360]
-        try:
-            self.get_logger().info("돌기 시작")
-            while rclpy.ok() and not self.stop_requested:
-                for a in angles:
-                    movej([a, 90, 0, 0, 0, 0], vel=60, acc=60)
-                    self.wait_and_spin(1.0)   # sleep 대신 spin → stop 토픽 수신 가능
-                    if self.stop_requested:
-                        break
-            self.get_logger().info("⏹ 돌기 정지")
-        except Exception as e:
-            self.get_logger().error(f"❌ 돌기 중 에러 발생: {e}")
-
-    def move_custom_joint(self):
-        try:
-            self.get_logger().info(f"🎯 지정한 각도(좌표)로 이동 시작: {self.target_joint_data}")
-            # movej 함수를 이용해 해당 좌표로 직선 이동 (속도, 가속도 60)
-            ret = movej(self.target_joint_data, vel=60, acc=60) 
-            time.sleep(3.0) 
-            self.get_logger().info(f"movej ret={ret}")
-            self.get_logger().info(f"이동 후 state={get_robot_state()}, pos={get_current_posx()[0]}")
-            self.get_logger().info("✅ 커스텀 각도 이동 완료") 
-        except Exception as e:
-            self.get_logger().error(f"❌ 커스텀 포즈 이동 중 에러 발생: {e}")
-    
-    def mode_recover(self):
-                try:
-                    self.get_logger().info("⚠️ 복구모드 시작")
-                    self.recover_robot_team_style()
-                except Exception as e:
-                    self.get_logger().error(f"❌ 복구모드 중 에러 발생: {e} ")  
-
-# ------------------------------------------------------------------------------------------------------------------ 
+# -------------------------------------------------------------------------------------------------------------
+    # STOP 함수
+    def check_stop(self):
+        if self.stop_requested:
+            raise StopRequested()
 # -------------------------------------------------------------------------------------------------------------            
 def main(args = None):
     rclpy.init(args=args)
     node = RobotController()
     
     DR_init.__dsr__node = node  # 내가 만든 노드 객체를 두산 라이브러리에 연결!
-    global movel, movej, get_current_posx, posx, posj, set_safe_stop_reset_type, get_robot_state, set_robot_mode
-    from DSR_ROBOT2 import movel, movej, get_current_posx, set_safe_stop_reset_type, get_robot_state, set_robot_mode
+    global movel, movej, get_current_posx, posx, posj, set_safe_stop_reset_type, get_robot_state, set_robot_mode, get_current_posj
+    from DSR_ROBOT2 import movel, movej, get_current_posx, set_safe_stop_reset_type, get_robot_state, set_robot_mode, get_current_posj
     from DR_common2 import posx, posj
 
     print("\n"+ "=" * 60 + "\n 🚀 멀티스레드 백그라운드 스핀 + 메인 상태 체크 루프 시작!\n" + "=" * 60)
