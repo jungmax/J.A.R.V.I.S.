@@ -97,18 +97,15 @@ class RobotController(Node):
         self.get_logger().info(f"📢 들어온 음성 명령: {command}")
 
         if command == "recover":
-            self.pending = command
+            self.def_pending(command)
             
 
     def joint_callback(self, msg):
         # msg.data에 들어 있는 숫자 배열을 파이썬 리스트로 변환
         target_joint = list(msg.data)
-        # 로그로 잘 들어왔는지 확인 (f-string 문법 살짝 수정!)
         self.get_logger().info(f"📢 들어온 타겟 관절 각도: {target_joint}")
-        # 1. 들어온 관절 값을 클래스 변수에 저장해 둠
         self.target_joint_data = target_joint
-        # 2. 메인 루프가 실행할 수 있도록 pending에 명령 이름 등록
-        self.pending = "move_custom_joint"
+        self.def_pending("move_custom_joint")
 
     def pose_callback(self, msg): 
         self.get_logger().info("📥 [포즈 토픽 수신됨!] 데이터 처리 시작...")
@@ -162,7 +159,7 @@ class RobotController(Node):
         try:
             self.get_logger().info("\n" + "-" * 50 + "\n 🏠 홈 포지션으로 이동 시작...\n" + "-" * 50)
             ret = movej([0, 0, 90, 0, 90, 0], vel=60, acc=60) 
-            time.sleep(3.0); 
+            time.sleep(1.0); 
             self.get_logger().info(f"movel ret={ret}")
             self.get_logger().info(f"이동 후 state={get_robot_state()}, pos={get_current_posj()}")
             self.get_logger().info("\n" + "-" * 50 + "\n ✅ 홈 포지션 완료\n" + "-" * 50)
@@ -173,7 +170,7 @@ class RobotController(Node):
         try:
             self.get_logger().info("\n" + "-" * 50 + "\n 초기 포지션으로 이동 시작...\n" + "-" * 50)
             ret = movej([0, 0, 0, 0, 0, 0], vel=60, acc=60) 
-            time.sleep(3.0); 
+            time.sleep(1.0); 
             self.get_logger().info(f"movel ret={ret}")
             self.get_logger().info(f"이동 후 state={get_robot_state()}, pos={get_current_posj()}") 
             self.get_logger().info("✅ 초기 포지션 완료") 
@@ -199,7 +196,7 @@ class RobotController(Node):
             self.get_logger().info(f"🎯 지정한 각도(좌표)로 이동 시작: {self.target_joint_data}")
             # movej 함수를 이용해 해당 좌표로 직선 이동 (속도, 가속도 60)
             ret = movej(self.target_joint_data, vel=60, acc=60) 
-            time.sleep(3.0) 
+            time.sleep(1.0) 
             self.get_logger().info(f"movej ret={ret}")
             self.get_logger().info(f"이동 후 state={get_robot_state()}, pos={get_current_posx()[0]}")
             self.get_logger().info("✅ 커스텀 각도 이동 완료") 
@@ -274,10 +271,9 @@ class RobotController(Node):
         self.get_logger().info(f"📤 [전송 완료] {val}번, {name} ➔ 응답 대기 시작")
         while rclpy.ok():
             rclpy.spin_once(self, timeout_sec=0.01)
-            if future.done(): 
-                return True
-            if time.time() - start > 2.0: 
-                return False
+            if future.done():
+                res = future.result()
+                return res is not None and res.success
             
     # 팀 고유 복구 (3 -> 2 -> 1)
     def recover_robot_team_style(self):
@@ -325,7 +321,7 @@ def main(args = None):
 
     try:
         while rclpy.ok():
-            rclpy.spin_once(node, timeout_sec=0.01) 
+            rclpy.spin_once(node, timeout_sec = 1) 
             node.state_check()
             node.run() 
     except KeyboardInterrupt:
