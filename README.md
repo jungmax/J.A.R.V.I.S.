@@ -103,11 +103,6 @@ ros2 topic pub --once /robot/target_joint std_msgs/msg/Float64MultiArray "{data:
 | 2 | stop 토픽을 보내도 콜백이 실행되지 않음 | `time.sleep()` 동안 `spin_once`가 안 돌아서 콜백이 호출되지 않음 | `time.sleep(1.0)`을 `self.wait_and_spin(1.0)`으로 교체 |
 | 3 | `pending`에 stop을 넣으면 처리되지 않음 | `circle()`이 `run()` 안에 갇혀 있어서 pending을 읽는 곳까지 못 돌아옴 | `pending`과 별개로 `stop_requested`라는 신호 변수를 따로 사용 |
 | 4 | 360 → 0으로 갈 때 역회전해서 원이 이어지지 않음 | `movej`는 목표 각도와의 숫자 차이만큼 그대로 이동함 | 누적 방식(`angle += step`)은 J1 한계(±360° 추정)를 넘으면 에러가 나므로, 한계 안에서 되돌아오는 기존 방식 유지 |
-| 5 | circle 도는 중 home을 보내면 로그만 뜨고 실행이 안 됨 | 콜백이 `pending`에 넣어도 `circle()`이 끝난 뒤 `finally`에서 `pending = None`으로 지워짐 | `self.busy` 플래그를 추가하고, busy일 때는 경고 로그를 찍고 `return` |
-| 6 | busy 체크 코드가 콜백 안에 길게 들어가 지저분함 | 콜백 세 개에 같은 체크를 반복해야 함 | `reject_if_busy()` 헬퍼 함수로 분리 |
-| 7 | 실행 후 두 번째 명령부터 계속 거절됨 | `run()`의 `finally`에서 `busy = False`를 안 해서 busy가 계속 True로 남음 | `finally`에 `self.busy = False` 추가 |
-| 8 | busy일 때 stop도 거절됨 | stop 처리가 busy 체크보다 뒤에 있음 | stop을 busy 체크보다 **먼저** 처리 |
-| 9 | `self.busy` 관련 에러 가능성 | `__init__`에 `self.busy = False` 선언이 없음 | `__init__`에서 `self.busy = False` 선언 |
 
 
 ## 학습한 개념
